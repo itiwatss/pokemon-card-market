@@ -175,7 +175,6 @@ export default function CartDrawer({
                             variant="outlined"
                             fullWidth
                             onClick={() => handleRemoveFromCart(e)}
-                            // disabled={e.totalCard === 1}
                             sx={{
                               minWidth: "54px",
                               minHeight: "54px",

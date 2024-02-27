@@ -697,6 +697,7 @@ export default function Home() {
               <Grid item xs={12}>
                 <Stack direction={"row"} justifyContent={"center"}>
                   <Pagination
+                    size="small"
                     count={totalCount < 20 ? 1 : Math.floor(totalCount / 20)}
                     page={page}
                     shape="rounded"
