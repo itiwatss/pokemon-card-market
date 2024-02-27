@@ -150,7 +150,6 @@ export default function Home() {
         setIsLoading(checkLoad);
       })
       .catch((error) => {
-        console.log("🚀 ~ getPokemonList ~ error:", error);
         setPokemonList([]);
         setPage(1);
         setTotalCount(1);
