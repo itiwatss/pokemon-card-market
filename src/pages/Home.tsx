@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import axios from "axios";
-import styles from "./App.module.scss";
+import styles from "./Home.module.scss";
 import {
   Button,
   Container,
@@ -22,10 +22,10 @@ import {
   CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { ReactComponent as ShoppingBag } from "../src/assets/shopping-bag.svg";
-import { ReactComponent as ArrowDownIcon } from "../src/assets/arrow-ios-down.svg";
-import CartDrawer from "./components/cartDrawer";
-import { SetType, PokemonListType, CartItemType } from "./utils/type";
+import { ReactComponent as ShoppingBag } from "../assets/shopping-bag.svg";
+import { ReactComponent as ArrowDownIcon } from "../assets/arrow-ios-down.svg";
+import CartDrawer from "../components/cartDrawer";
+import { SetType, PokemonListType, CartItemType } from "../utils/type";
 
 export default function Home() {
   const [pokemonList, setPokemonList] = useState<PokemonListType[] | []>([]);
@@ -129,6 +129,7 @@ export default function Home() {
   // Call API to get Pokemon List
   const getPokemonList = (page: number, query: string): void => {
     const url = "https://api.pokemontcg.io/v2/cards";
+    let checkLoad = true;
     setIsLoading(true);
     axios
       .get(url, {
@@ -145,9 +146,17 @@ export default function Home() {
         setPokemonList(response.data.data);
         setPage(response.data.page);
         setTotalCount(response.data.totalCount);
-        setIsLoading(false);
+        checkLoad = false;
+        setIsLoading(checkLoad);
       })
-      .catch((error) => {});
+      .catch((error) => {
+        console.log("🚀 ~ getPokemonList ~ error:", error);
+        setPokemonList([]);
+        setPage(1);
+        setTotalCount(1);
+        checkLoad = false;
+        setIsLoading(checkLoad);
+      });
   };
 
   // Handle API function to get Pokemon Type that use in Select Filter
@@ -313,6 +322,7 @@ export default function Home() {
             variant="outlined"
             placeholder="Search By Name"
             fullWidth
+            onChange={handleSearchChange}
             sx={{
               display: { xs: "block", sm: "none" },
               "& .MuiOutlinedInput-root": {
@@ -572,7 +582,18 @@ export default function Home() {
                   />
                 </Stack>
               ) : pokemonList.length === 0 ? (
-                <>no data</>
+                <Stack
+                  direction={"row"}
+                  justifyContent={"center"}
+                  alignItems={"center"}
+                  sx={{
+                    width: "100%",
+                    height: "300px",
+                    color: "#ABBBC2",
+                  }}
+                >
+                  No Data
+                </Stack>
               ) : (
                 pokemonList.map((e, index) => {
                   return (

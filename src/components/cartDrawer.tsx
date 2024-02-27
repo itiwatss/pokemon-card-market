@@ -135,7 +135,7 @@ export default function CartDrawer({
               >
                 {cartList.map((e: CartItemType, index) => {
                   return (
-                    <Grid container>
+                    <Grid container key={index}>
                       <Grid item xs={2} pt={2}>
                         <img key={index} src={e.cardImage} width={44} alt="" />
                       </Grid>
