@@ -12,7 +12,6 @@ import {
   Stack,
   TextField,
   Typography,
-  Drawer,
   Card,
   FormControl,
   InputLabel,
@@ -20,120 +19,13 @@ import {
   MenuItem,
   SelectChangeEvent,
   Pagination,
+  CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { ReactComponent as ShoppingBag } from "../src/assets/shopping-bag.svg";
-import { ReactComponent as CloseIcon } from "../src/assets/close-icon.svg";
 import { ReactComponent as ArrowDownIcon } from "../src/assets/arrow-ios-down.svg";
-
-export interface AbilityType {
-  name: string;
-  text: string;
-  type: string;
-}
-
-export interface AttacksType {
-  cost: string[];
-  name: string;
-  text: string;
-  damage: string;
-  convertedEnergyCost: number;
-}
-
-export interface TypeNValue {
-  type: string;
-  value: string;
-}
-
-export interface SetImageType {
-  logo: string;
-  symbol: string;
-}
-
-export interface SetType {
-  id: string;
-  name: string;
-  series: string;
-  printedTotal: number;
-  total: number;
-  legalities: LegalitiesType;
-  ptcgoCode: string;
-  releaseDate: string;
-  updatedAt: string;
-  images: SetImageType;
-}
-
-export interface ImageType {
-  small: string;
-  large: string;
-}
-
-export interface LegalitiesType {
-  expanded: string;
-  unlimited: string;
-  standard: string;
-}
-
-export interface TcgPlayerType {
-  url: string;
-  updatedAt: string;
-  prices: string;
-}
-
-export interface CardMarketType {
-  url: string;
-  updatedAt: string;
-  prices: CardMarketPriceType;
-}
-
-export interface CardMarketPriceType {
-  averageSellPrice: number;
-  lowPrice: number;
-  trendPrice: number;
-  germanProLow: number;
-  suggestedPrice: number;
-  reverseHoloSell: number;
-  reverseHoloLow: number;
-  reverseHoloTrend: number;
-  lowPriceExPlus: number;
-  avg1: number;
-  avg7: number;
-  avg30: number;
-  reverseHoloAvg1: number;
-  reverseHoloAvg7: number;
-  reverseHoloAvg30: number;
-}
-
-export interface PokemonListType {
-  id: string;
-  name: string;
-  supertype: string;
-  subtypes: string[];
-  level: string;
-  hp: string;
-  types: string[];
-  evolvesFrom: string;
-  evolvesTo: string[];
-  rules: string[];
-  ancientTrait: string;
-  abilities: AbilityType;
-  attacks: AttacksType;
-  weaknesses: TypeNValue;
-  resistances: TypeNValue;
-  retreatCost: string[];
-  convertedRetreatCost: number;
-  set: SetType;
-  number: string;
-  artist: string;
-  rarity: string;
-  flavorText: string;
-  nationalPokedexNumberxs: number[];
-  legalities: LegalitiesType;
-  regulationMark: string;
-  images: ImageType;
-  tcgplayer: TcgPlayerType;
-  cardmarket: CardMarketType;
-}
+import CartDrawer from "./components/cartDrawer";
+import { SetType, PokemonListType, CartItemType } from "./utils/type";
 
 export default function Home() {
   const [pokemonList, setPokemonList] = useState<PokemonListType[] | []>([]);
@@ -146,7 +38,12 @@ export default function Home() {
   const [pokemonRarityList, setPokemonRarityList] = useState<string[]>([]);
   const [page, setPage] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [cartList, setCartList] = useState<CartItemType[] | []>([]);
+  const [query, setQuery] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [search, setSearch] = useState("");
 
+  // for handle Filter Select Value
   const handleSetSelect = (event: SelectChangeEvent) => {
     setPokemonSet(event.target.value as string);
   };
@@ -158,23 +55,81 @@ export default function Home() {
   const handleTypeSelect = (event: SelectChangeEvent) => {
     setPokemonType(event.target.value as string);
   };
-  // const [search, setSearch] = useState("");
 
+  // Since API return euro currency so we need to convert to dollar before display
   const convertEuroToDollar = (euro: number) => {
     return (euro * 1.09).toFixed(2);
   };
 
+  // Function for handle page change in pagination
   const handlePageChange = (
     event: React.ChangeEvent<unknown>,
     value: number
   ) => {
-    getPokemonList(value);
+    getPokemonList(value, "");
     setPage(value);
+    window.scrollTo(0, 0); // Reset user scroll to top page
   };
 
-  const getPokemonList = (page: number): void => {
-    const url = "https://api.pokemontcg.io/v2/cards";
+  // Function for handle add to cart action
+  const handleAddToCart = (item: PokemonListType) => {
+    const pokemonExist = cartList.find((e) => e.name === item.name);
+    if (pokemonExist) {
+      setCartList(
+        cartList.map((e) =>
+          e.name === item.name
+            ? {
+                ...pokemonExist,
+                totalCard: pokemonExist.totalCard + 1,
+                totalPrice: pokemonExist.totalPrice + e.cardPrice,
+              }
+            : e
+        )
+      );
+    } else {
+      const cartItem = {
+        cardImage: item.images.small,
+        name: item.name,
+        cardPrice: parseFloat(
+          convertEuroToDollar(item.cardmarket.prices.averageSellPrice)
+        ),
+        totalCard: 1,
+        totalPrice: parseFloat(
+          convertEuroToDollar(item.cardmarket.prices.averageSellPrice)
+        ),
+      };
 
+      setCartList([...cartList, cartItem]);
+    }
+  };
+
+  // Function for handle remove from card action
+  const handleRemoveFromCart = (item: PokemonListType) => {
+    const pokemonExist = cartList.find((e) => e.name === item.name);
+    if (pokemonExist?.totalCard === 1) {
+      cartList.map((e, index) =>
+        e.totalCard === 1 ? cartList.splice(index, 1) : e
+      );
+      setCartList([...cartList]);
+    } else if (pokemonExist) {
+      setCartList(
+        cartList.map((e) =>
+          e.name === item.name
+            ? {
+                ...pokemonExist,
+                totalCard: pokemonExist.totalCard - 1,
+                totalPrice: pokemonExist.totalPrice - e.cardPrice,
+              }
+            : e
+        )
+      );
+    }
+  };
+
+  // Call API to get Pokemon List
+  const getPokemonList = (page: number, query: string): void => {
+    const url = "https://api.pokemontcg.io/v2/cards";
+    setIsLoading(true);
     axios
       .get(url, {
         headers: {
@@ -183,17 +138,19 @@ export default function Home() {
         params: {
           page: page,
           pageSize: "20",
+          q: query,
         },
       })
       .then((response) => {
-        console.log("POKEMON LIST RESPONSE :", response.data);
         setPokemonList(response.data.data);
         setPage(response.data.page);
         setTotalCount(response.data.totalCount);
+        setIsLoading(false);
       })
       .catch((error) => {});
   };
 
+  // Handle API function to get Pokemon Type that use in Select Filter
   const getPokemonType = (): void => {
     const url = "https://api.pokemontcg.io/v2/types";
 
@@ -209,6 +166,7 @@ export default function Home() {
       .catch((error) => {});
   };
 
+  // Handle API function to get Pokemon Set that use in Select Filter
   const getPokemonSet = (): void => {
     const url = "https://api.pokemontcg.io/v2/sets";
 
@@ -219,12 +177,12 @@ export default function Home() {
         },
       })
       .then((response) => {
-        // console.log("POKEMON SET RESPONSE :", response.data.data);
         setPokemonSetList(response.data.data);
       })
       .catch((error) => {});
   };
 
+  // Handle API function to get Pokemon Rarity that use in Select Filter
   const getPokemonRarity = (): void => {
     const url = "https://api.pokemontcg.io/v2/rarities";
 
@@ -235,75 +193,48 @@ export default function Home() {
         },
       })
       .then((response) => {
-        // console.log("POKEMON RARITY RESPONSE :", response.data.data);
         setPokemonRarityList(response.data.data);
       })
       .catch((error) => {});
   };
 
+  // Handle OnChange in search bar
+  const handleSearchChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>
+  ) => {
+    setSearch(e.target.value);
+    setQuery(`name: ${e.target.value}`);
+  };
+
+  // Call Pokemon Type, Set and Rarity API
   useEffect(() => {
-    getPokemonList(1);
     getPokemonType();
     getPokemonSet();
     getPokemonRarity();
   }, []);
 
+  // Handle Pokemon List API with query
+  useEffect(() => {
+    setQuery(
+      `${search ? `name:${search}` : ""} ${
+        pokemonSet ? `set.name:${pokemonSet}` : ""
+      } ${pokemonRarity ? `rarity:${pokemonRarity}` : ""} ${
+        pokemonType ? `types:${pokemonType}` : ""
+      }`
+    );
+    getPokemonList(1, query);
+  }, [query, pokemonSet, pokemonRarity, pokemonType, search]);
+
   return (
     <Stack direction="column" className={styles.main}>
-      <Drawer
-        open={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        anchor="right"
-        sx={{
-          // width: 400,
-          '& .MuiDrawer-paper': {
-            width: { xs: "100%", sm: 400 },
-            boxSizing: 'border-box',
-          },
-          bgcolor: "rgba(0, 0, 0, 0.75)",
-        }}
-      >
-        <Stack
-          direction={"column"}
-          sx={{
-            p: 3,
-            bgcolor: "#1F1D2B",
-            height: "100%",
-          }}
-        >
-          <Stack direction={"row"} justifyContent={"space-between"}>
-            <Stack direction={"column"} spacing={1}>
-              <Typography variant="h5" fontWeight={"600"} color={"white"}>
-                Cart
-              </Typography>
-              <Typography
-                variant="body2"
-                color={"#ABBBC2"}
-                sx={{ textDecoration: "underline", cursor: "pointer" }}
-              >
-                Clear all
-              </Typography>
-            </Stack>
-            <Button
-              variant="outlined"
-              onClick={() => setIsDrawerOpen(false)}
-              sx={{
-                width: "48px",
-                background: "#EA7C69",
-                border: 0,
-                "&:hover": {
-                  background: "#d86654",
-                  border: 0,
-                },
-              }}
-            >
-              <IconButton aria-label="delete" size="small">
-                <CloseIcon style={{ width: "16px" }} />
-              </IconButton>
-            </Button>
-          </Stack>
-        </Stack>
-      </Drawer>
+      <CartDrawer
+        isDrawerOpen={isDrawerOpen}
+        setIsDrawerOpen={setIsDrawerOpen}
+        cartList={cartList}
+        setCartList={setCartList}
+        handleAddToCart={handleAddToCart}
+        handleRemoveFromCart={handleRemoveFromCart}
+      />
       <Container>
         <Stack direction="column" spacing={2}>
           <Stack
@@ -322,6 +253,7 @@ export default function Home() {
                 variant="outlined"
                 placeholder="Search By Name"
                 fullWidth
+                onChange={handleSearchChange}
                 sx={{
                   display: { xs: "none", sm: "block" },
                   "& .MuiOutlinedInput-root": {
@@ -339,7 +271,7 @@ export default function Home() {
                 InputProps={{
                   sx: {
                     "& input": {
-                      color: "#ABBBC2",
+                      color: "white",
                       opacity: 1,
                     },
                     "& input::placeholder": {
@@ -347,7 +279,6 @@ export default function Home() {
                       opacity: 1,
                     },
                     borderRadius: "8px",
-                    borderColor: "red",
                   },
                   startAdornment: (
                     <InputAdornment position="start">
@@ -362,18 +293,18 @@ export default function Home() {
                 variant="outlined"
                 onClick={() => setIsDrawerOpen(true)}
                 sx={{
-                  width: "48px",
+                  minWidth: "48px",
+                  minHeight: "48px",
                   background: "#EA7C69",
                   border: 0,
+                  boxShadow: "0px 8px 24px 0px #EA7C6952",
                   "&:hover": {
                     background: "#d86654",
                     border: 0,
                   },
                 }}
               >
-                <IconButton aria-label="delete">
-                  <ShoppingBag />
-                </IconButton>
+                <ShoppingBag />
               </Button>
             </Stack>
           </Stack>
@@ -479,6 +410,9 @@ export default function Home() {
                     },
                   }}
                 >
+                  <MenuItem key={"default"} value={""}>
+                    -
+                  </MenuItem>
                   {pokemonSetList.map((e, index) => {
                     return (
                       <MenuItem key={index} value={e.name}>
@@ -537,6 +471,9 @@ export default function Home() {
                     },
                   }}
                 >
+                  <MenuItem key={"default"} value={""}>
+                    -
+                  </MenuItem>
                   {pokemonRarityList.map((e, index) => {
                     return (
                       <MenuItem key={index} value={e}>
@@ -595,6 +532,9 @@ export default function Home() {
                     },
                   }}
                 >
+                  <MenuItem key={"default"} value={""}>
+                    -
+                  </MenuItem>
                   {pokemonTypeList.map((e, index) => {
                     return (
                       <MenuItem key={index} value={e}>
@@ -615,142 +555,166 @@ export default function Home() {
             }}
           >
             <Grid container>
-              {pokemonList.map((e, index) => {
-                return (
-                  <Grid key={index} item xs={12} sm={4} md={2} pb={2}>
-                    <Stack
-                      direction={"column"}
-                      alignItems={"center"}
-                      spacing={1}
-                      sx={{
-                        position: "relative",
-                        marginTop: "100px",
-                      }}
-                    >
-                      <Card
+              {isLoading ? (
+                <Stack
+                  direction={"row"}
+                  justifyContent={"center"}
+                  alignItems={"center"}
+                  sx={{
+                    width: "100%",
+                    height: "300px",
+                  }}
+                >
+                  <CircularProgress
+                    sx={{
+                      color: "#EA7C69",
+                    }}
+                  />
+                </Stack>
+              ) : pokemonList.length === 0 ? (
+                <>no data</>
+              ) : (
+                pokemonList.map((e, index) => {
+                  return (
+                    <Grid key={index} item xs={12} sm={4} md={2} pb={2}>
+                      <Stack
+                        direction={"column"}
+                        alignItems={"center"}
+                        spacing={1}
                         sx={{
-                          width: { xs: "90%", sm: "150px" },
-                          height: "170px",
-                          bgcolor: "#1F1D2B",
-                          borderRadius: 3,
-                          p: 2,
+                          position: "relative",
+                          marginTop: "100px",
                         }}
                       >
-                        <img
-                          key={index}
-                          src={e.images.large}
-                          width={100}
-                          alt=""
-                          style={{
-                            position: "absolute",
-                            top: "-90px",
-                            left: 0,
-                            right: 0,
-                            margin: "0 auto",
-                            borderRadius: "4px",
-                          }}
-                        />
-                        <Stack
-                          direction={"column"}
-                          alignItems={"center"}
-                          justifyContent={"space-between"}
-                          spacing={1}
+                        <Card
                           sx={{
-                            width: "100%",
-                            height: "100%",
+                            width: { xs: "90%", sm: "150px" },
+                            height: "170px",
+                            bgcolor: "#1F1D2B",
+                            borderRadius: 3,
+                            p: 2,
                           }}
                         >
-                          <Typography
-                            variant="body2"
-                            color={"white"}
-                            fontWeight={600}
-                            sx={{
-                              paddingBottom: 1,
-                              marginTop: "50px !important",
-                              textAlign: "center",
+                          <img
+                            key={index}
+                            src={e.images.large}
+                            width={100}
+                            alt=""
+                            style={{
+                              position: "absolute",
+                              top: "-90px",
+                              left: 0,
+                              right: 0,
+                              margin: "0 auto",
+                              borderRadius: "4px",
                             }}
-                          >
-                            {e.name}
-                          </Typography>
+                          />
                           <Stack
                             direction={"column"}
+                            alignItems={"center"}
+                            justifyContent={"space-between"}
                             spacing={1}
                             sx={{
                               width: "100%",
+                              height: "100%",
                             }}
                           >
+                            <Typography
+                              variant="body2"
+                              color={"white"}
+                              fontWeight={600}
+                              sx={{
+                                paddingBottom: 1,
+                                marginTop: "50px !important",
+                                textAlign: "center",
+                              }}
+                            >
+                              {e.name}
+                            </Typography>
                             <Stack
-                              direction={"row"}
-                              justifyContent={"center"}
-                              spacing={0.5}
+                              direction={"column"}
+                              spacing={1}
                               sx={{
                                 width: "100%",
                               }}
                             >
-                              <Stack direction={"row"} spacing={0.2}>
-                                <Typography variant="body2" color={"#ABBBC2"}>
-                                  $
+                              <Stack
+                                direction={"row"}
+                                justifyContent={"center"}
+                                spacing={0.5}
+                                sx={{
+                                  width: "100%",
+                                }}
+                              >
+                                <Stack direction={"row"} spacing={0.2}>
+                                  <Typography variant="body2" color={"#ABBBC2"}>
+                                    $
+                                  </Typography>
+                                  <Typography variant="body2" color={"#ABBBC2"}>
+                                    {convertEuroToDollar(
+                                      e?.cardmarket?.prices?.averageSellPrice
+                                    )}
+                                  </Typography>
+                                </Stack>
+                                <Typography variant="body2" color={"#312F3C"}>
+                                  •
                                 </Typography>
                                 <Typography variant="body2" color={"#ABBBC2"}>
-                                  {convertEuroToDollar(
-                                    e.cardmarket.prices.averageSellPrice
-                                  )}
+                                  {e.set.total} Cards
                                 </Typography>
                               </Stack>
-                              <Typography variant="body2" color={"#312F3C"}>
-                                •
-                              </Typography>
-                              <Typography variant="body2" color={"#ABBBC2"}>
-                                {e.set.total} Cards
-                              </Typography>
+                              <Button
+                                variant="contained"
+                                fullWidth
+                                startIcon={
+                                  <ShoppingBag style={{ width: "16px" }} />
+                                }
+                                disabled={e.set.total === 0}
+                                sx={{
+                                  borderRadius: "8px",
+                                  bgcolor: "#312F3C",
+                                  textTransform: "none",
+                                  boxShadow: 0,
+                                  "&:disabled": {
+                                    bgcolor: "#FFFFFF0A",
+                                    color: "#FFFFFF66",
+                                  },
+                                }}
+                                onClick={() => handleAddToCart(e)}
+                              >
+                                Add to cart
+                              </Button>
                             </Stack>
-                            <Button
-                              variant="contained"
-                              fullWidth
-                              startIcon={
-                                <ShoppingBag style={{ width: "16px" }} />
-                              }
-                              disabled={e.set.total === 0}
-                              sx={{
-                                bgcolor: "#312F3C",
-                                textTransform: "none",
-                                boxShadow: 0,
-                                "&:disabled": {
-                                  bgcolor: "#FFFFFF0A",
-                                  color: "#FFFFFF66",
-                                },
-                              }}
-                            >
-                              Add to cart
-                            </Button>
                           </Stack>
-                        </Stack>
-                      </Card>
-                    </Stack>
-                  </Grid>
-                );
-              })}
+                        </Card>
+                      </Stack>
+                    </Grid>
+                  );
+                })
+              )}
             </Grid>
-            <Grid xs={12}>
-              <Stack direction={"row"} justifyContent={"center"}>
-                <Pagination
-                  count={Math.floor(totalCount / 20)}
-                  page={page}
-                  shape="rounded"
-                  onChange={handlePageChange}
-                  sx={{
-                    button: { color: "#ffffff" },
-                    "& .MuiPaginationItem-root": {
-                      color: "white",
-                      "&.Mui-selected": {
-                        background: "#1F1D2B",
+            {!isLoading && (
+              <Grid item xs={12}>
+                <Stack direction={"row"} justifyContent={"center"}>
+                  <Pagination
+                    count={totalCount < 20 ? 1 : Math.floor(totalCount / 20)}
+                    page={page}
+                    shape="rounded"
+                    onChange={handlePageChange}
+                    sx={{
+                      button: { color: "#ffffff" },
+                      "& .MuiPaginationItem-root": {
                         color: "white",
+                        "&.Mui-selected": {
+                          background: "#1F1D2B",
+                          color: "white",
+                        },
                       },
-                    },
-                  }}
-                />
-              </Stack>
-            </Grid>
+                    }}
+                  />
+                </Stack>
+              </Grid>
+            )}
           </Stack>
         </Stack>
       </Container>
